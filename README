@@ -1,0 +1,94 @@
+NAME
+    Statistics::Gap - Perl extension for the "Gap Statistics"
+
+SYNOPSIS
+      use Statistics::Gap;
+      &gap("GapPrefix", "Filename.txt", "manhattan", "agglo", 5, 3);
+
+DESCRIPTION
+        Given a dataset how does one automatically find the optimal number 
+        of clusters that the dataset should be grouped into? - is one of the 
+        prevailing problems. Statisticians Robert Tibshirani, Guenther Walther 
+        and Trevor Hastie  propose a solution for this problem is a Techinal 
+        Report named - "Estimating the number of clusters in a dataset via 
+        the Gap Statistics". This perl module implements the approach proposed 
+        in the above paper.
+
+EXPORT
+     "gap" function by default.
+
+INPUT
+  Prefix
+        The string that should be used to as a prefix while naming the 
+        intermediate files and the .png files (graph files).
+
+  InputFile
+        The input dataset is expected in a plain text file where the first
+        line in the file gives the dimensions of the dataset and then the 
+        dataset in a matrix format should follow. The contexts / observations 
+        should be along the rows and the features should be along the column.
+
+   DistanceMeasure
+        The Distance Measure that should be used.
+        Currrently this module supports the following distance measure:
+        1. Manhattan (string that should be used as an argument: "manhattan")
+        2. Euclidean (string that should be used as an argument: "euclidean")
+        3. Squared Euclidean (string that should be used as an argument: "squared")
+
+   ClusteringAlgorithm
+        The Clustering Measures that can be used are:
+        1. rb - Repeated Bisections [Default]
+        2. rbr - Repeated Bisections for by k-way refinement
+        3. direct - Direct k-way clustering
+        4. agglo  - Agglomerative clustering
+        5. graph  - Graph partitioning-based clustering
+        6. bagglo - Partitional biased Agglomerative clustering
+
+   K value
+        This is an approximate upper bound for the number of clusters that may be
+        present in the dataset. Thus for a dataset that you expect to be seperated
+        into 3 clusters this value should be set some integer value greater than 3.
+
+   B value
+        Specifies the number of time the reference distribution should be generated
+        Typical value would be 3.
+
+OUTPUT
+        The output returned is a single integer value which indicates the optimal
+        number of clusters that the input dataset should be clustered into.
+
+PRE-REQUISITES
+        This module uses suite of C programs called CLUTO for clustering purposes. 
+        Thus CLUTO needs to be installed for this module to be functional.
+        CLUTO can be downloaded from http://www-users.cs.umn.edu/~karypis/cluto/
+
+SEE ALSO
+        http://citeseer.ist.psu.edu/tibshirani00estimating.html
+        http://www-users.cs.umn.edu/~karypis/cluto/
+
+AUTHOR
+        Anagha Kulkarni, University of Minnesota Duluth
+        kulka020 <at> d.umn.edu
+        
+        Ted Pedersen, University of Minnesota Duluth
+        tpederse <at> d.umn.edu
+
+        Guergana Savova, Mayo Clinic
+        savova.guergana <at> mayo.edu
+
+COPYRIGHT AND LICENSE
+        Copyright (C) 2005-2006, Ted Pedersen, Guergana Savova and Anagha Kulkarni
+
+        This program is free software; you can redistribute it and/or
+        modify it under the terms of the GNU General Public License
+        as published by the Free Software Foundation; either version 2
+        of the License, or (at your option) any later version.
+        This program is distributed in the hope that it will be useful,
+        but WITHOUT ANY WARRANTY; without even the implied warranty of
+        MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+        GNU General Public License for more details.
+
+        You should have received a copy of the GNU General Public License
+        along with this program; if not, write to the Free Software
+        Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+

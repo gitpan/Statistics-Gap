@@ -1,0 +1,6 @@
+Revision history for Perl extension Statistics::Gap.
+
+0.01  Tue Jun  7 10:45:58 2005
+	- original version; created by h2xs 1.23 with options
+		-XAn Statistics::Gap
+

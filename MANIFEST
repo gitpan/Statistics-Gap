@@ -1,0 +1,11 @@
+Changes
+Makefile.PL
+MANIFEST
+README
+t/2_senses.t
+t/2_senses
+t/4_senses.t
+t/4_senses
+t/mix.t
+t/mix
+lib/Statistics/Gap.pm
