@@ -11,7 +11,7 @@ our @ISA = qw(Exporter);
 
 our @EXPORT = qw( gap );
 
-our $VERSION = '0.01';
+our $VERSION = '0.02';
 
 # pre-requisites
 use GD;
@@ -21,6 +21,7 @@ use GD::Graph::colour;
 
 # global variable
 my $distfuncref;
+my @d = ();
 
 # Calculates optimal number of clusters that should be used to 
 # cluster the input data using the "Gap Statistics"
@@ -33,6 +34,8 @@ sub gap
     my $clustmtd = shift;
     my $K = shift;
     my $B = shift;
+    my $i = 0;
+    my $j = 0;
 
     # To optimize the code we have pulled out this if-else loop
     # from the innermost for loop below. Depending upon the
@@ -50,7 +53,7 @@ sub gap
     {
 	$distfuncref = \&dist_manhattan;
     }
-
+    
     # read the matrix file into a 2 dimensional array.
     my @inpmat = ();
     open(INP,"<$matrixfile") || die "Error opening input matrix file!";
@@ -91,7 +94,25 @@ sub gap
 
     close INP;
 
+    my @row1 = ();
+    my @row2 = ();
 
+    # calculate the pairwise distances for all possible unique pairs (n(n-1)/2)
+    for($i = 0; $i < $rcnt; $i++)
+    {
+	# for all the rows in the cluster
+	for($j = $i+1; $j < $rcnt; $j++)
+	{
+	    @row1 = @{$inpmat[$i]};
+	    
+	    @row2 = @{$inpmat[$j]};
+	    
+	    $d[$i][$j] = &$distfuncref(\@row1, \@row2);
+	    
+#	    print "distance between $i and $j = $d[$i][$j]\n";
+	}
+    }
+    
     #~~~~~~~~~~~~~~~~~~~~ Step 1: Calculate the Error Measure (Wk) for the observed data ~~~~~~~~~~~~~~~~~~~~~~~~
 
     #local variables
@@ -163,7 +184,6 @@ sub gap
     print FILE $my_graph->plot([\@k,\@tmp_W])->png;
     close(FILE);
 
-    
     #~~~~~~~~~~~~~~ End of Step 1 ~~~~~~~~~~~~~~~~~~~~~~~
 
 
@@ -175,8 +195,6 @@ sub gap
     my @min = ();
     my @diff = ();
 
-    my $i = 0;
-    my $j =0;
     my $p = 0;
 
     # Calculate the min and max for each column in the observed
@@ -210,6 +228,7 @@ sub gap
     # Repeat the complete Reference Distribution generation procedure B times.
     for($i = 1; $i <= $B; $i++)
     {
+
 	# create the reference matrix
 	for($p = 0; $p < $ccnt; $p++)
 	{
@@ -412,8 +431,8 @@ sub error_measure
     my $j;
     my @rownum;
     my $key;
-    my @row1 = ();
-    my @row2 = ();
+    my $row1;
+    my $row2;
     my $W = 0;
     my @D = ();
     my $tmp;
@@ -432,14 +451,18 @@ sub error_measure
 	    for($j = $i+1; $j <= $#rownum; $j++)
 	    {
 		# find the distance between the 2 rows of the matrix.
-		$tmp = $rownum[$i];
-		@row1 = @{$matrix[$tmp]};
-		
-		$tmp = $rownum[$j];
-		@row2 = @{$matrix[$tmp]};
+		$row1 = $rownum[$i];
+		$row2 = $rownum[$j];
 
 		# store the Dr value
-		$D[$key] += &$distfuncref(\@row1, \@row2);
+		if(exists $d[$row1][$row2])
+		{
+		    $D[$key] += $d[$row1][$row2];
+		}
+		else
+		{
+		    $D[$key] += $d[$row2][$row1];
+		}
 	    }
 	}
 
@@ -614,15 +637,12 @@ Statistics::Gap - Perl extension for the "Gap Statistics"
     Anagha Kulkarni, University of Minnesota Duluth
     kulka020 <at> d.umn.edu
 	
-    Ted Pedersen, University of Minnesota Duluth
-    tpederse <at> d.umn.edu
-
     Guergana Savova, Mayo Clinic
     savova.guergana <at> mayo.edu
 
 =head1 COPYRIGHT AND LICENSE
 
-    Copyright (C) 2005-2006, Ted Pedersen, Guergana Savova and Anagha Kulkarni
+    Copyright (C) 2005-2006, Guergana Savova and Anagha Kulkarni
 
     This program is free software; you can redistribute it and/or
     modify it under the terms of the GNU General Public License

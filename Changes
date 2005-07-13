@@ -4,3 +4,8 @@ Revision history for Perl extension Statistics::Gap.
 	- original version; created by h2xs 1.23 with options
 		-XAn Statistics::Gap
 
+
+0.02  Wed Jul 13 2005
+	- Optimized the module by removing the calculation of
+	  distance between vectors from the loop and instead
+	  pre-computing all possible unique pairwise distances. 
