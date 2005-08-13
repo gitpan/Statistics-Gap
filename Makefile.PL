@@ -4,7 +4,7 @@ use ExtUtils::MakeMaker;
 # the contents of the Makefile that is written.
 WriteMakefile(
     NAME              => 'Statistics::Gap',
-    VERSION	      => '0.02',
+    VERSION	      => '0.03',
     VERSION_FROM      => 'lib/Statistics/Gap.pm',
     PREREQ_PM         => {GD => 2.19,
 			  GD::Text => 0.86,

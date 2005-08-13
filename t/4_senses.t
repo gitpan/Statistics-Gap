@@ -1,5 +1,5 @@
 # 2_sense.t version 0.01
-# (Updated 07/06/2005 -- Anagha)
+# (Updated 08/13/2005 -- Anagha)
 #
 # A script to run tests on the Statistics::Gap module.
 # This test cases check for 2 sense input matrix.
@@ -18,7 +18,7 @@ BEGIN { use_ok('Statistics::Gap') };
 my $ans = 4;
 
 my $result = 0;
-$result = &gap("pre_4", "t/4_senses", "manhattan", "agglo", 5, 3);
+$result = &gap("pre_4", "t/4_senses", "manhattan", "rb", 5, 30, "prop");
 
 is($result, $ans, "Comparing Gap Statistics' answer ($result) with the actual optimal number of clusters ($ans) for the input data");
 

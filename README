@@ -3,18 +3,33 @@ NAME
 
 SYNOPSIS
       use Statistics::Gap;
-      &gap("GapPrefix", "Filename.txt", "manhattan", "agglo", 5, 3);
+      &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 3, "unif");
+
+      OR
+
+      use Statistics::Gap;
+      &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 3, "prop");
 
 DESCRIPTION
         Given a dataset how does one automatically find the optimal number 
         of clusters that the dataset should be grouped into? - is one of the 
         prevailing problems. Statisticians Robert Tibshirani, Guenther Walther 
-        and Trevor Hastie  propose a solution for this problem is a Techinal 
+        and Trevor Hastie  propose a solution for this problem in a Techinal 
         Report named - "Estimating the number of clusters in a dataset via 
         the Gap Statistics". This perl module implements the approach proposed 
         in the above paper.
 
-EXPORT
+        NOTE: 
+        Gap Statistics uses reference distribution in the process of estimating
+        the number of clusters. The appropriate methodology for generation of this 
+        reference distribution is dependent on the data to be clustered. 
+        This module was implemented for data with following characteristics:
+        1. highly sparse - very few features occur in any given observation.
+        2. high multivariate dimensionality (i.e. large feature space)
+        3. binary feature frequency - feature either occurs or does not occur 
+           in an observation.
+
+  EXPORT
      "gap" function by default.
 
 INPUT
@@ -31,9 +46,9 @@ INPUT
    DistanceMeasure
         The Distance Measure that should be used.
         Currrently this module supports the following distance measure:
-        1. Manhattan (string that should be used as an argument: "manhattan")
-        2. Euclidean (string that should be used as an argument: "euclidean")
-        3. Squared Euclidean (string that should be used as an argument: "squared")
+        1. Squared Euclidean (string that should be used as an argument: "squared")
+        2. Manhattan (string that should be used as an argument: "manhattan")
+        3. Euclidean (string that should be used as an argument: "euclidean")
 
    ClusteringAlgorithm
         The Clustering Measures that can be used are:
@@ -50,17 +65,32 @@ INPUT
         into 3 clusters this value should be set some integer value greater than 3.
 
    B value
-        Specifies the number of time the reference distribution should be generated
-        Typical value would be 3.
+        Specifies the number of time the reference distribution should be generated.
+
+   ReferenceGenerationMethod
+        1. Uniform - While generating the reference distribution, all the features
+        in the feature set have equal probability of being selected for the observation
+        under consideration.
+    
+        2. Proportional - Each feature is assigned a probability of being selected
+        depending upon its frequency of occurrence in the observed data. Thus feature
+        distribution is taken into consideration while selecting the features for the 
+        reference distribution generation.
 
 OUTPUT
-        The output returned is a single integer value which indicates the optimal
+        The output returned is a single integer number which indicates the optimal
         number of clusters that the input dataset should be clustered into.
 
 PRE-REQUISITES
-        This module uses suite of C programs called CLUTO for clustering purposes. 
+        1. This module uses suite of C programs called CLUTO for clustering purposes. 
         Thus CLUTO needs to be installed for this module to be functional.
         CLUTO can be downloaded from http://www-users.cs.umn.edu/~karypis/cluto/
+
+        2. Following Perl Modules
+            1. GD   (http://search.cpan.org/~lds/GD-2.19/GD.pm)
+            2. GD::Text     (http://search.cpan.org/~mverb/GDTextUtil-0.86/Text.pm)
+            3. GD::Graph::lines     (http://search.cpan.org/~mverb/GDGraph-1.43/)
+            4. GD::Graph::colour    (http://search.cpan.org/~mverb/GDGraph-1.43/Graph/colour.pm)
 
 SEE ALSO
         http://citeseer.ist.psu.edu/tibshirani00estimating.html
