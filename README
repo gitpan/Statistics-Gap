@@ -1,14 +1,27 @@
 NAME
-    Statistics::Gap - Perl extension for the "Gap Statistics"
+    Statistics::Gap - Perl extension for the "Gap Statistic"
 
 SYNOPSIS
       use Statistics::Gap;
-      &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 3, "unif");
+      &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 100, "unif", 90);
 
       OR
 
       use Statistics::Gap;
-      &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 3, "prop");
+      &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 100, "prop", 90);
+
+
+      Input file is expected in the "dense" format -
+      Sample Input file:
+
+      6 5
+        1       1       0       0       1
+        1       0       0       0       0
+        1       1       0       0       1
+        1       1       0       0       1
+        1       0       0       0       1
+        1       1       0       0       1 	  	
+
 
 DESCRIPTION
         Given a dataset how does one automatically find the optimal number 
@@ -16,20 +29,28 @@ DESCRIPTION
         prevailing problems. Statisticians Robert Tibshirani, Guenther Walther 
         and Trevor Hastie  propose a solution for this problem in a Techinal 
         Report named - "Estimating the number of clusters in a dataset via 
-        the Gap Statistics". This perl module implements the approach proposed 
-        in the above paper.
+        the Gap Statistic". This perl module implements the approach proposed 
+        in the above paper. 
+
+	If one tries to cluster a dataset (i.e. numerous observations described 
+	in terms of a feature space) into n groups/clusters and if we plot the
+	graph of Within Cluster (Dis)Similarity along Y-axis and Number of clusters
+	along X-axis then this graph generally takes a form of a elbow/knee depending
+	upon the measure on the Y-axis. The Gap Statistic seeks to locate this
+	elbow/knee because the value on the X-axis at this elbow is the optimal 
+	number of clusters for the data.	
 
         NOTE: 
-        Gap Statistics uses reference distribution in the process of estimating
+        Gap Statistic uses reference distribution in the process of estimating
         the number of clusters. The appropriate methodology for generation of this 
         reference distribution is dependent on the data to be clustered. 
         This module was implemented for data with following characteristics:
         1. highly sparse - very few features occur in any given observation.
         2. high multivariate dimensionality (i.e. large feature space)
         3. binary feature frequency - feature either occurs or does not occur 
-           in an observation.
+           in an observation but rarely occurs multiple times in the same observation.
 
-  EXPORT
+EXPORT
      "gap" function by default.
 
 INPUT
@@ -38,10 +59,27 @@ INPUT
         intermediate files and the .png files (graph files).
 
   InputFile
-        The input dataset is expected in a plain text file where the first
-        line in the file gives the dimensions of the dataset and then the 
-        dataset in a matrix format should follow. The contexts / observations 
-        should be along the rows and the features should be along the column.
+	The input dataset is expected in "dense" matrix format.
+	The input dense matrix is expected in a plain text file where the first
+	line in the file gives the dimensions of the dataset and then the 
+	dataset in a matrix format should follow. The contexts / observations 
+	should be along the rows and the features should be along the column.
+
+	eg:
+      	6 5
+        1       1       0       0       1
+        1       0       0       0       0
+        1       1       0       0       1
+        1       1       0       0       1
+        1       0       0       0       1
+        1       1       0       0       1 	
+
+	The first line (6 5) gives the number of rows (observations) and the 
+	number of columns (features) present in the following matrix.
+	Following each line records the frequency of occurrence of the feature
+	at the column in the given observation. Thus features1 (1st column) occurs
+	once in the observation1 and infact once in all the other observations too 
+	while the feature3 does not occur in observation1.
 
    DistanceMeasure
         The Distance Measure that should be used.
@@ -77,10 +115,21 @@ INPUT
         distribution is taken into consideration while selecting the features for the 
         reference distribution generation.
 
-OUTPUT
-        The output returned is a single integer number which indicates the optimal
-        number of clusters that the input dataset should be clustered into.
+   Percentage Confidence Interval
+	This parameter specifies the percentage confidence to be reported in the log file.
+	Since Statistics::Gap uses parametric bootstrap method for reference distribution 
+	generation, it is critical to understand the interval around the sample mean that
+	could contain the population ("true") mean and with what certainty.
 
+OUTPUT		
+        1. The PREFIX.out file contains a single integer number which is the Gap Statistic's 
+	estimate of number of clusters present in the input dataset.
+        2. The PREFIX.log file contains the log of various values at different K values.
+	The first table in the file gives values like Gap(k), log(W(k)) etc. for every K value
+	experimented with.	
+        3. The PREFIX.fig*.png files are the graphical representations of different values which
+	help locate the knee/elbow. 
+	
 PRE-REQUISITES
         1. This module uses suite of C programs called CLUTO for clustering purposes. 
         Thus CLUTO needs to be installed for this module to be functional.
@@ -118,4 +167,3 @@ COPYRIGHT AND LICENSE
         You should have received a copy of the GNU General Public License
         along with this program; if not, write to the Free Software
         Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
-

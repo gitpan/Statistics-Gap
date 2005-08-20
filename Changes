@@ -13,3 +13,9 @@ Revision history for Perl extension Statistics::Gap.
 0.03  Sat Aug 13 2005
 	- Modified the reference distribution generation 
 	  method.	
+
+0.04  Sat Aug 20 2005
+	- Some bug fixes: Removed unnecessary division by 2 in the calculation of Dr
+	- Added log file to the set of output files.
+	- Added confidence interval calculation
+	- Updated documentation

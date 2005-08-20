@@ -1,10 +1,12 @@
 use 5.008005;
 use ExtUtils::MakeMaker;
+
 # See lib/ExtUtils/MakeMaker.pm for details of how to influence
 # the contents of the Makefile that is written.
+
 WriteMakefile(
     NAME              => 'Statistics::Gap',
-    VERSION	      => '0.03',
+    VERSION	      => '0.04',
     VERSION_FROM      => 'lib/Statistics/Gap.pm',
     PREREQ_PM         => {GD => 2.19,
 			  GD::Text => 0.86,
@@ -14,3 +16,4 @@ WriteMakefile(
       (ABSTRACT_FROM  => 'lib/Statistics/Gap.pm', # retrieve abstract from module
        AUTHOR         => 'Anagha Kulkarni <kulka020@d.umn.edu>, Guergana Savova <savova.guergana@mayo.edu>') : ()),
 );
+

@@ -11,6 +11,12 @@ SYNOPSIS
 DESCRIPTION
 
    Prerequisites
+
+	C Programs:
+	----------
+	1.CLUTO (http://www-users.cs.umn.edu/~karypis/cluto/)
+
+
 	Perl Modules:
 	------------
 	1. GD	(http://search.cpan.org/~lds/GD-2.19/GD.pm)
@@ -18,11 +24,15 @@ DESCRIPTION
 	3. GD::Graph::lines	(http://search.cpan.org/~mverb/GDGraph-1.43/)
   	4. GD::Graph::colour	(http://search.cpan.org/~mverb/GDGraph-1.43/Graph/colour.pm)
 
-	C Programs:
-	----------
-	1.CLUTO (http://www-users.cs.umn.edu/~karypis/cluto/)
+	Note: 1. GD uses libgd 2.0.25 or higher and is thus a indirect pre-requisite for this module.
+	         libgd can be downloaded from http://www.boutell.com/	
+	      2. The main functionality of this module is not dependent on the GD modules. Thus using a force
+		 installed Statistics::Gap would still estimate the optimal number of clusters for the
+		 given dataset even if libgd and GD is not installed.
+
 
    Installing
+
 	Method 1:
 	--------
 	The usual way to install the package is to run the following commands:

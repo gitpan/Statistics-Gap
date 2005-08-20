@@ -3,7 +3,7 @@ package Statistics::Gap;
 use 5.008005;
 use strict;
 use warnings;
-use POSIX qw(floor);
+use POSIX qw(floor ceil);
 
 require Exporter;
 use AutoLoader qw(AUTOLOAD);
@@ -12,13 +12,14 @@ our @ISA = qw(Exporter);
 
 our @EXPORT = qw( gap );
 
-our $VERSION = '0.03';
+our $VERSION = '0.04';
 
 # pre-requisites
 use GD;
 use GD::Text;
 use GD::Graph::lines;
 use GD::Graph::colour;
+use Data::Dumper;
 
 # global variable
 my $distfuncref;
@@ -35,6 +36,7 @@ sub gap
     my $K = shift;
     my $B = shift;
     my $mtd = shift;
+    my $perc = shift;
 
     my $i = 0;
     my $j = 0;
@@ -71,6 +73,15 @@ sub gap
     $line=~s/\s+/ /;
     
     ($rcnt,$ccnt) = split(/\s+/,$line);
+
+    # Not a valid condition: 
+    # If maximum number of clusters requested (k) is greater than the 
+    # number of observations.
+    if($K > $rcnt)
+    {
+	print STDERR "The K value ($K) cannot be greater than the number of observations present in the input data ($rcnt). \n";
+	exit 1;
+    }
 
     # copy the complete matrix to a 2D array
     while(<INP>)
@@ -147,7 +158,7 @@ sub gap
 	my $out_filename = "tmp.op" . $k . time();
 	my $status = 0;
 	$status = system("vcluster --clmethod $clustmtd $matrixfile $k >& $out_filename ");
-	die "Error running vclusters \n" unless $status==0;
+	die "Error running vcluster \n" unless $status==0;
 	
 	# read the clustering output file
 	open(CO,"<$matrixfile.clustering.$k") || die "Error opening clustering output file.";
@@ -250,7 +261,7 @@ sub gap
 	    # 2. Calculate the Wk*
 	    
 	    # Write the matrix to a temporary file
-	    my $filename = "tmp.ref." . time();
+	    my $filename = "tmp.ref." . time() . $i;
 	    open(RO,">$filename") || die "Error opening temporary file ($filename) in write mode.\n";
 	    
 	    my $ccnt = $#{$refmat[0]} + 1;
@@ -271,7 +282,7 @@ sub gap
 		my $out_filename = "tmp.ref.op." . $k . "." . time();
 		my $status = 0;
 		$status = system("vcluster --clmethod $clustmtd $filename $k >& $out_filename");
-		die "Error running vclusters \n" unless $status==0;
+		die "Error running vcluster \n" unless $status==0;
 		
 		# read the clustering output file
 		open(CO,"<$filename.clustering.$k") || die "Error opening clustering output file.";
@@ -445,7 +456,7 @@ sub gap
 	    # 2. Calculate the Wk*
 	    
 	    # Write the matrix to a temporary file
-	    my $filename = "tmp.ref." . time();
+	    my $filename = "tmp.ref." . time() . $i;
 	    open(RO,">$filename") || die "Error opening temporary file ($filename) in write mode.\n";
 	    
 	    my $ccnt = $#{$refmat[0]} + 1;
@@ -466,7 +477,7 @@ sub gap
 		my $out_filename = "tmp.ref.op." . $k . "." . time();
 		my $status = 0;
 		$status = system("vcluster --clmethod $clustmtd $filename $k >& $out_filename");
-		die "Error running vclusters \n" unless $status==0;
+		die "Error running vcluster \n" unless $status==0;
 		
 		# read the clustering output file
 		open(CO,"<$filename.clustering.$k") || die "Error opening clustering output file.";
@@ -501,6 +512,7 @@ sub gap
 	    }
 	    
 	    unlink "$filename", "$filename.tree";
+
 	} # for $B
     }# else "proportional"
 
@@ -519,13 +531,15 @@ sub gap
 	    $sum[$i] += $W_M[$j][$i];
 	}
 	
+	$sum[$i] = sprintf("%.4f",$sum[$i]/$B) + 0;
 	# Calculate Gap(k) = 1/B(summationOverB(log(Wkb*))) - log(Wk)
-	$gap[$i] = $sum[$i]/$B - $W[$i];
+	$gap[$i] = sprintf("%.4f", $sum[$i] - $W[$i]) + 0;
 	
 	# for the graph
 	$tmp_gap[$i-1] = $gap[$i];
-	$E_W[$i-1] = $sum[$i]/$B;
+	$E_W[$i-1] = $sum[$i];
     }
+
 
     # For plotting of graph of obs and exp log(Wk) vs. K
     my $fig3 = new GD::Graph::lines(600,480);
@@ -556,14 +570,14 @@ sub gap
     {
 	for($j = 1; $j <= $B; $j++)
 	{
-	    $sd[$i] += ($W_M[$j][$i] - $sum[$i]/$B)**2;
+	    $sd[$i] += ($W_M[$j][$i] - $sum[$i])**2;
 	}
 	
-	$sd[$i] = sprintf("%.4f",sqrt($sd[$i]/$B));
+	$sd[$i] = sprintf("%.4f",sqrt($sd[$i]/$B)) + 0;
 	# Calculate the modified standard deviation to account for 
 	# simulation error.
 	$s[$i] = $sd[$i] * sqrt(1 + 1/$B);
-	$s[$i] = sprintf("%.4f",$s[$i]);
+	$s[$i] = sprintf("%.4f",$s[$i]) + 0;
     }
 
     my $ans = 1;
@@ -577,11 +591,11 @@ sub gap
     {
 	if($gap[$i+1] < 0)
 	{
-	    $tmp = $gap[$i+1] + $s[$i];
+	    $tmp = $gap[$i+1] + $s[$i+1];
 	}
 	else
 	{
-	    $tmp = $gap[$i+1] - $s[$i];
+	    $tmp = $gap[$i+1] - $s[$i+1];
 	}
 
 	if($gap[$i] >= $tmp)
@@ -603,10 +617,58 @@ sub gap
 		   'title' => 'Gap by k',
 		   'transparent' => '0',
 		   ) or warn $my_graph->error;
-
     open(FILE,">$prefix.fig4.png");
     print FILE $fig4->plot([\@k,\@tmp_gap])->png;
     close(FILE);
+
+    # Printing to the log file.
+    open(LO,">$prefix.log") || die "Error opening the Log file ($prefix.log) in write mode.\n";    
+
+    # Print the confidence intervals
+    my $alpha = 0;
+    my $low_conf_int = 0;
+    my $upp_conf_int = 0;
+    my @tmp = ();
+
+    printf LO "%3s  %10s  %10s  %10s  %10s  %10s  %30s\n", "K", "Gap(k)", "log(W(k))", "log(W*(k))", "sd(k)", "s(k)", "$perc% Confidence Intervals";   
+    printf LO "-" x 95 ."\n";
+    for($i = 1; $i <= $K; $i++)
+    {
+	# Calculate a from 100(1-2a) = %
+	$alpha = (1 - $perc/100)/2;
+
+	for($j = 1; $j <= $B; $j++)
+	{
+	    $tmp[$j-1] = $W_M[$j][$i];
+	}
+	# sort in the numeric ascending order 
+	@tmp = sort {$a <=> $b} (@tmp);    
+	
+	# Calculate lower bound = average of W*[floor(B*a)] and W*[ceil(B*a)]
+	$low_conf_int = ($tmp[floor($B*$alpha)-1] + $tmp[ceil($B*$alpha)-1])/2;
+	
+	# Calculate upper bound = average of W*[floor(B*(1-a))] and W*[ceil(B*(1-a))]
+	$upp_conf_int = ($tmp[floor($B*(1-$alpha))-1] + $tmp[ceil($B*(1-$alpha))-1])/2;
+	
+	printf LO "%3d  %10.4f  %10.4f  %10.4f  %10.4f  %10.4f  %30s\n", $i, $gap[$i], $W[$i], $sum[$i], $sd[$i], $s[$i], "$low_conf_int - $upp_conf_int";
+    }
+
+    print LO "\nIndividual Dispersion values:\n";
+    for($i = 1; $i <= $K; $i++)
+    {
+	print LO "K=$i\n";
+	printf LO "%3s  %10s\n", "B", "log(W*)"; 
+	printf LO "-" x 15 . "\n"; 
+	for($j = 1; $j <= $B; $j++)
+	{
+	    $tmp[$j-1] = $W_M[$j][$i];
+	    printf LO "%3s  %10s\n", "$j", "$W_M[$j][$i]"; 
+	}
+	print LO "\n";
+    }
+
+    close LO;
+
 
     print "$ans\n";
     return $ans;
@@ -660,12 +722,12 @@ sub error_measure
 	    }
 	}
 
-	$W += (1/(2 * ($#rownum + 1))) * $D[$key];
+	$W += (1/($#rownum + 1)) * $D[$key];
     }
 
     if($W != 0)
     {
-	$W = sprintf("%.4f", log($W)/log(10));
+	$W = sprintf("%.4f", log($W)/log(10)) + 0;
     }
 
     return $W;
@@ -692,7 +754,7 @@ sub dist_euclidean
     }
     $dist = sqrt($dist);
 
-    $retvalue = sprintf("%.4f",$dist);	
+    $retvalue = sprintf("%.4f",$dist) + 0;	
     return $retvalue;
 }
 
@@ -714,7 +776,7 @@ sub dist_euclidean_sqr
 	$dist += (($i[$a] - $j[$a])**2);
     }
 
-    $retvalue = sprintf("%.4f",$dist);	
+    $retvalue = sprintf("%.4f",$dist) + 0;	
     return $retvalue;
 }
 
@@ -737,7 +799,7 @@ sub dist_manhattan
        $dist += abs($i[$a] - $j[$a]);
     }
 
-    $retvalue = sprintf("%.4f",$dist);	
+    $retvalue = sprintf("%.4f",$dist) + 0;	
     return $retvalue;
 }
 
@@ -746,111 +808,159 @@ __END__
 
 =head1 NAME
 
-Statistics::Gap - Perl extension for the "Gap Statistics"
+ Statistics::Gap - Perl extension for the "Gap Statistic"
 
 =head1 SYNOPSIS
 
-  use Statistics::Gap;
-  &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 3, "unif");
+ use Statistics::Gap;
+ &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 100, "unif", 90);
 
-  OR
+ OR
 
-  use Statistics::Gap;
-  &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 3, "prop");
+ use Statistics::Gap;
+ &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 100, "prop", 90);
+
+ Input file is expected in the "dense" format -
+ Sample Input file:
+   
+ 6 5
+ 1       1       0       0       1
+ 1       0       0       0       0
+ 1       1       0       0       1
+ 1       1       0       0       1
+ 1       0       0       0       1
+ 1       1       0       0       1 	  	
 
 =head1 DESCRIPTION
 
-    Given a dataset how does one automatically find the optimal number 
-    of clusters that the dataset should be grouped into? - is one of the 
-    prevailing problems. Statisticians Robert Tibshirani, Guenther Walther 
-    and Trevor Hastie  propose a solution for this problem in a Techinal 
-    Report named - "Estimating the number of clusters in a dataset via 
-    the Gap Statistics". This perl module implements the approach proposed 
-    in the above paper.
+Given a dataset how does one automatically find the optimal number 
+of clusters that the dataset should be grouped into? - is one of the 
+prevailing problems. Statisticians Robert Tibshirani, Guenther Walther 
+and Trevor Hastie  propose a solution for this problem in a Techinal 
+Report named - "Estimating the number of clusters in a dataset via 
+the Gap Statistic". This perl module implements the approach proposed 
+in the above paper. 
 
-    NOTE: 
-    Gap Statistics uses reference distribution in the process of estimating
-    the number of clusters. The appropriate methodology for generation of this 
-    reference distribution is dependent on the data to be clustered. 
-    This module was implemented for data with following characteristics:
-    1. highly sparse - very few features occur in any given observation.
-    2. high multivariate dimensionality (i.e. large feature space)
-    3. binary feature frequency - feature either occurs or does not occur 
-       in an observation.
+If one tries to cluster a dataset (i.e. numerous observations described 
+in terms of a feature space) into n groups/clusters and if we plot the
+graph of Within Cluster (Dis)Similarity along Y-axis and Number of clusters
+along X-axis then this graph generally takes a form of a elbow/knee depending
+upon the measure on the Y-axis. The Gap Statistic seeks to locate this
+elbow/knee because the value on the X-axis at this elbow is the optimal 
+number of clusters for the data.	
+
+NOTE: 
+Gap Statistic uses reference distribution in the process of estimating
+the number of clusters. The appropriate methodology for generation of this 
+reference distribution is dependent on the data to be clustered. 
+This module was implemented for data with following characteristics:
+1. highly sparse - very few features occur in any given observation.
+2. high multivariate dimensionality (i.e. large feature space)
+3. binary feature frequency - feature either occurs or does not occur 
+in an observation but rarely occurs multiple times in the same observation.
 
 =head2 EXPORT
 
- "gap" function by default.
+"gap" function by default.
 
 =head1 INPUT
 
 =head2 Prefix
-    
-    The string that should be used to as a prefix while naming the 
-    intermediate files and the .png files (graph files).
+
+The string that should be used to as a prefix while naming the 
+intermediate files and the .png files (graph files).
 
 =head2 InputFile
 
-    The input dataset is expected in a plain text file where the first
-    line in the file gives the dimensions of the dataset and then the 
-    dataset in a matrix format should follow. The contexts / observations 
-    should be along the rows and the features should be along the column.
+The input dataset is expected in "dense" matrix format.
+The input dense matrix is expected in a plain text file where the first
+line in the file gives the dimensions of the dataset and then the 
+dataset in a matrix format should follow. The contexts / observations 
+should be along the rows and the features should be along the column.
 
-=head3 DistanceMeasure
+	eg:
+      	6 5
+        1       1       0       0       1
+        1       0       0       0       0
+        1       1       0       0       1
+        1       1       0       0       1
+        1       0       0       0       1
+        1       1       0       0       1 	
 
-    The Distance Measure that should be used.
-    Currrently this module supports the following distance measure:
-    1. Squared Euclidean (string that should be used as an argument: "squared")
-    2. Manhattan (string that should be used as an argument: "manhattan")
-    3. Euclidean (string that should be used as an argument: "euclidean")
+The first line (6 5) gives the number of rows (observations) and the 
+number of columns (features) present in the following matrix.
+Following each line records the frequency of occurrence of the feature
+at the column in the given observation. Thus features1 (1st column) occurs
+once in the observation1 and infact once in all the other observations too 
+while the feature3 does not occur in observation1.
 
-=head3 ClusteringAlgorithm
+=head2  DistanceMeasure
 
-    The Clustering Measures that can be used are:
-    1. rb - Repeated Bisections [Default]
-    2. rbr - Repeated Bisections for by k-way refinement
-    3. direct - Direct k-way clustering
-    4. agglo  - Agglomerative clustering
-    5. graph  - Graph partitioning-based clustering
-    6. bagglo - Partitional biased Agglomerative clustering
+The Distance Measure that should be used.
+Currrently this module supports the following distance measure:
+1. Squared Euclidean (string that should be used as an argument: "squared")
+2. Manhattan (string that should be used as an argument: "manhattan")
+3. Euclidean (string that should be used as an argument: "euclidean")
 
-=head3 K value
+=head2  ClusteringAlgorithm
+
+The Clustering Measures that can be used are:
+1. rb - Repeated Bisections [Default]
+2. rbr - Repeated Bisections for by k-way refinement
+3. direct - Direct k-way clustering
+4. agglo  - Agglomerative clustering
+5. graph  - Graph partitioning-based clustering
+6. bagglo - Partitional biased Agglomerative clustering
+
+=head2  K value
+
+This is an approximate upper bound for the number of clusters that may be
+present in the dataset. Thus for a dataset that you expect to be seperated
+into 3 clusters this value should be set some integer value greater than 3.
+
+=head2  B value
+
+Specifies the number of time the reference distribution should be generated.
+
+=head2  ReferenceGenerationMethod
+
+1. Uniform - While generating the reference distribution, all the features
+in the feature set have equal probability of being selected for the observation
+under consideration.
     
-    This is an approximate upper bound for the number of clusters that may be
-    present in the dataset. Thus for a dataset that you expect to be seperated
-    into 3 clusters this value should be set some integer value greater than 3.
+2. Proportional - Each feature is assigned a probability of being selected
+depending upon its frequency of occurrence in the observed data. Thus feature
+distribution is taken into consideration while selecting the features for the 
+reference distribution generation.
 
-=head3 B value
-    
-    Specifies the number of time the reference distribution should be generated.
+=head2  Percentage Confidence Interval
 
-=head3 ReferenceGenerationMethod
-
-    1. Uniform - While generating the reference distribution, all the features
-    in the feature set have equal probability of being selected for the observation
-    under consideration.
-    
-    2. Proportional - Each feature is assigned a probability of being selected
-    depending upon its frequency of occurrence in the observed data. Thus feature
-    distribution is taken into consideration while selecting the features for the 
-    reference distribution generation.
+This parameter specifies the percentage confidence to be reported in the log file.
+Since Statistics::Gap uses parametric bootstrap method for reference distribution 
+generation, it is critical to understand the interval around the sample mean that
+could contain the population ("true") mean and with what certainty.
 
 =head1 OUTPUT
 
-    The output returned is a single integer number which indicates the optimal
-    number of clusters that the input dataset should be clustered into.
+1. The PREFIX.out file contains a single integer number which is the Gap Statistic's 
+estimate of number of clusters present in the input dataset.
+2. The PREFIX.log file contains the log of various values at different K values.
+The first table in the file gives values like Gap(k), log(W(k)) etc. for every K value
+experimented with.	
+3. The PREFIX.fig*.png files are the graphical representations of different values which
+help locate the knee/elbow. 
 
 =head1 PRE-REQUISITES
 
-    1. This module uses suite of C programs called CLUTO for clustering purposes. 
-    Thus CLUTO needs to be installed for this module to be functional.
-    CLUTO can be downloaded from http://www-users.cs.umn.edu/~karypis/cluto/
+1. This module uses suite of C programs called CLUTO for clustering purposes. 
+Thus CLUTO needs to be installed for this module to be functional.
+CLUTO can be downloaded from http://www-users.cs.umn.edu/~karypis/cluto/
 
-    2. Following Perl Modules
-        1. GD	(http://search.cpan.org/~lds/GD-2.19/GD.pm)
-	2. GD::Text	(http://search.cpan.org/~mverb/GDTextUtil-0.86/Text.pm)
-	3. GD::Graph::lines	(http://search.cpan.org/~mverb/GDGraph-1.43/)
-  	4. GD::Graph::colour	(http://search.cpan.org/~mverb/GDGraph-1.43/Graph/colour.pm)
+2. Following Perl Modules
+   1. GD   (http://search.cpan.org/~lds/GD-2.19/GD.pm)
+   2. GD::Text     (http://search.cpan.org/~mverb/GDTextUtil-0.86/Text.pm)
+   3. GD::Graph::lines     (http://search.cpan.org/~mverb/GDGraph-1.43/)
+   4. GD::Graph::colour    (http://search.cpan.org/~mverb/GDGraph-1.43/Graph/colour.pm)
 
 =head1 SEE ALSO
 
@@ -867,19 +977,19 @@ Statistics::Gap - Perl extension for the "Gap Statistics"
 
 =head1 COPYRIGHT AND LICENSE
 
-    Copyright (C) 2005-2006, Guergana Savova and Anagha Kulkarni
+Copyright (C) 2005-2006, Guergana Savova and Anagha Kulkarni
 
-    This program is free software; you can redistribute it and/or
-    modify it under the terms of the GNU General Public License
-    as published by the Free Software Foundation; either version 2
-    of the License, or (at your option) any later version.
-    This program is distributed in the hope that it will be useful,
-    but WITHOUT ANY WARRANTY; without even the implied warranty of
-    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-    GNU General Public License for more details.
+This program is free software; you can redistribute it and/or
+modify it under the terms of the GNU General Public License
+as published by the Free Software Foundation; either version 2
+of the License, or (at your option) any later version.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+GNU General Public License for more details.
 
-    You should have received a copy of the GNU General Public License
-    along with this program; if not, write to the Free Software
-    Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
+You should have received a copy of the GNU General Public License
+along with this program; if not, write to the Free Software
+Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
 
 =cut
