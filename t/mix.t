@@ -18,7 +18,7 @@ BEGIN { use_ok('Statistics::Gap') };
 my $ans = 5;
 
 my $result = 0;
-$result = &gap("pre_mix", "t/mix", "squared", "agglo", 7, 30, "prop");
+$result = &gap("pre_mix", "t/mix", "squared", "agglo", 7, 30, "prop",80);
 
 is($result, $ans, "Comparing Gap Statistics' answer ($result) with the actual optimal number of clusters ($ans) for the input data");
 

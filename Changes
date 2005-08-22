@@ -19,3 +19,7 @@ Revision history for Perl extension Statistics::Gap.
 	- Added log file to the set of output files.
 	- Added confidence interval calculation
 	- Updated documentation
+
+0.05  Mon Aug 22 2005
+	- Corrected the *.t files
+	

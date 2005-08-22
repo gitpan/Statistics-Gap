@@ -12,7 +12,7 @@ our @ISA = qw(Exporter);
 
 our @EXPORT = qw( gap );
 
-our $VERSION = '0.04';
+our $VERSION = '0.05';
 
 # pre-requisites
 use GD;
@@ -942,7 +942,7 @@ could contain the population ("true") mean and with what certainty.
 
 =head1 OUTPUT
 
-1. The PREFIX.out file contains a single integer number which is the Gap Statistic's 
+1. A single integer number at STDOUT which is the Gap Statistic's 
 estimate of number of clusters present in the input dataset.
 2. The PREFIX.log file contains the log of various values at different K values.
 The first table in the file gives values like Gap(k), log(W(k)) etc. for every K value
