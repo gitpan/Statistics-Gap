@@ -12,20 +12,21 @@ our @ISA = qw(Exporter);
 
 our @EXPORT = qw( gap );
 
-our $VERSION = '0.05';
+our $VERSION = '0.06';
 
 # pre-requisites
 use GD;
 use GD::Text;
 use GD::Graph::lines;
 use GD::Graph::colour;
-use Data::Dumper;
 
 # global variable
 my $distfuncref;
-my @d = ();
+my @d = ();  		# holds distances between unique pairs of rows of the input matrix
+my @d_ref = ();  	# holds distances between unique pairs of rows of the reference matrix
+my @mapping = ();   # maps each row of the replicate matrix with the original reference matrix
 
-# Estimates number of clusters that a given data naturally falls into
+# Estimates the number of clusters that a given data naturally falls into
 sub gap
 {
     # input params
@@ -41,6 +42,7 @@ sub gap
     my $i = 0;
     my $j = 0;
     my $c = 0;
+	my $format = 0;
 
     # To optimize the code we have pulled out this if-else loop
     # from the innermost for loop below. Depending upon the
@@ -48,15 +50,15 @@ sub gap
     # here and thus the if-else loop is executed only once.
     if($distmeasure=~/euclidean/i)    # Euclidean measure 
     {
-	$distfuncref = \&dist_euclidean;
+		$distfuncref = \&dist_euclidean;
     } 
     elsif($distmeasure=~/squared/i)    # Squared Euclidean measure 
     {
-	$distfuncref = \&dist_euclidean_sqr;
+		$distfuncref = \&dist_euclidean_sqr;
     }
     elsif($distmeasure=~/manhattan/i)    # Manhattan measure 
     {
-	$distfuncref = \&dist_manhattan;
+		$distfuncref = \&dist_manhattan;
     }
     
     # read the matrix file into a 2 dimensional array.
@@ -70,41 +72,94 @@ sub gap
 
     $line = <INP>;
     chomp($line);
-    $line=~s/\s+/ /;
-    
-    ($rcnt,$ccnt) = split(/\s+/,$line);
+
+	# remove leading white spaces
+	$line=~s/^\s+//;
+
+	my @tmp = ();
+    @tmp = split(/\s+/,$line);
+	$rcnt = $tmp[0];
+	$ccnt = $tmp[1];
+
+	if($#tmp == 2)
+	{
+		$format = 1; #sparse
+	}
 
     # Not a valid condition: 
     # If maximum number of clusters requested (k) is greater than the 
     # number of observations.
     if($K > $rcnt)
     {
-	print STDERR "The K value ($K) cannot be greater than the number of observations present in the input data ($rcnt). \n";
-	exit 1;
+		print STDERR "The K value ($K) cannot be greater than the number of observations present in the input data ($rcnt). \n";
+		exit 1;
     }
 
     # copy the complete matrix to a 2D array
-    while(<INP>)
-    {
-	# remove the newline at the end of the input line
-	chomp;
-
-	# skip empty lines
-	if(m/^\s*\s*\s*$/)
+	if($format) # for sparse input format - convert to dense format and then read into the 2D matrix
 	{
-	    next;
+		my $index = 0;
+		my $value = 0;
+
+		while(<INP>)
+		{
+			# remove the newline at the end of the input line
+			chomp;
+			
+			# for empty lines
+			if(m/^\s*\s*\s*$/)
+			{
+				# populate them into the 2D matrix
+				my @zeroes = ((0) x $ccnt);
+				push @inpmat, \@zeroes;
+			}
+			else
+			{
+				# remove leading white spaces
+				s/^\s+//;
+				
+				# seperate individual values in a line
+				@tmp = ();
+				@tmp = split(/\s+/);
+				
+				# populate them into the 2D matrix
+				my @zeroes = ((0) x $ccnt);
+				
+				for($i=0; $i<$#tmp; $i=$i+2)
+				{
+					$index=$tmp[$i]-1;
+					$value=$tmp[$i+1];
+					$zeroes[$index] = $value;
+				}
+				
+				push @inpmat, \@zeroes;
+			}
+		}
 	}
-
-	# remove leading white spaces
-	s/^\s+//;
-
-	# seperate individual values in a line
-	my @tmp = ();
-	@tmp = split(/\s+/);
-	
-	# populate them into the 2D matrix
-	push @inpmat, [ @tmp ]; 
-    }
+	else # for dense input format - read into the 2D matrix
+	{
+		while(<INP>)
+		{
+			# remove the newline at the end of the input line
+			chomp;
+			
+			# skip empty lines
+			if(m/^\s*\s*\s*$/)
+			{
+				next;
+			}
+			
+			# remove leading white spaces
+			s/^\s+//;
+			
+			# seperate individual values in a line
+			@tmp = ();
+			@tmp = split(/\s+/);
+			
+			# populate them into the 2D matrix
+			push @inpmat, [ @tmp ]; 
+		}
+	}
 
     close INP;
 
@@ -115,29 +170,29 @@ sub gap
     my @cmar = ((0) x $ccnt);
     my $totalElem = 0;
 
-    # calculate the pairwise distances for all possible unique pairs (n(n-1)/2)
+    # calculate the pairwise distances for all possible unique pairs (n(n-1)/2) of the observed data
     for($i = 0; $i < $rcnt; $i++)
     {
-	# for all the rows in the cluster
-	for($j = $i+1; $j < $rcnt; $j++)
-	{
-	    @row1 = @{$inpmat[$i]};
+		# for all the rows in the cluster
+		for($j = $i+1; $j < $rcnt; $j++)
+		{
+			@row1 = @{$inpmat[$i]};
 	    
-	    @row2 = @{$inpmat[$j]};
-	    
-	    $d[$i][$j] = &$distfuncref(\@row1, \@row2);
-	}
+			@row2 = @{$inpmat[$j]};
+			
+			$d[$i][$j] = &$distfuncref(\@row1, \@row2);
+		}
 
-	# calculate the marinals and the total number of non-zero values
-	for($c = 0; $c < $ccnt; $c++)
-	{
-	    if($inpmat[$i][$c] != 0)
-	    {
-		$rmar[$i] += 1;
-		$cmar[$c] += 1;
-		$totalElem += 1;
-	    }
-	}
+		# calculate the marinals and the total number of non-zero values
+		for($c = 0; $c < $ccnt; $c++)
+		{
+			if($inpmat[$i][$c] != 0)
+			{
+				$rmar[$i] += 1;
+				$cmar[$c] += 1;
+				$totalElem += 1;
+			}
+		}
     }
 
     #~~~~~~~~~~~~~~~~~~~~ Step 1: Calculate the Error Measure (Wk) for the observed data ~~~~~~~~~~~~~~~~~~~~~~~~
@@ -151,56 +206,56 @@ sub gap
     # loop through K times
     for($k=1; $k<=$K; $k++)
     {
-	my $lineNo = 0;
-	my %hash = ();
-
-	# cluster the input matrix(nXm) i.e. cluster n observations into k clusters
-	my $out_filename = "tmp.op" . $k . time();
-	my $status = 0;
-	$status = system("vcluster --clmethod $clustmtd $matrixfile $k >& $out_filename ");
-	die "Error running vcluster \n" unless $status==0;
-	
-	# read the clustering output file
-	open(CO,"<$matrixfile.clustering.$k") || die "Error opening clustering output file.";
-
-	my $clust = 0;
-	while($clust = <CO>)
-	{
-	    # hash on the cluster# and append the observation# 
-	    chomp($clust);
-	    if(exists $hash{$clust})
-	    {
-		$hash{$clust} .= " $lineNo";
-	    }
-	    else
-	    {
-		$hash{$clust} = $lineNo;
-	    }
-
-	    # increment the line number
-	    $lineNo++;
-	}
-
-	close CO;
-
-	# Calculate the "Within Cluster Dispersion Measure / Error Measure" Wk 
-	# for given matrix and k value.
-	$W[$k] = &error_measure(\@inpmat, \%hash);
-
-	# for the graph plotting
-	$tmp_W[$k-1] = $W[$k];
-	$k[$k-1] = $k;
-
-	unlink "$out_filename","$matrixfile.clustering.$k";	
+		my $lineNo = 0;
+		my %hash = ();
+		
+		# cluster the input matrix(nXm) i.e. cluster n observations into k clusters
+		my $out_filename = "tmp.op" . $k . time();
+		my $status = 0;
+		$status = system("vcluster --clmethod $clustmtd $matrixfile $k >& $out_filename ");
+		die "Error running vcluster \n" unless $status==0;
+		
+		# read the clustering output file
+		open(CO,"<$matrixfile.clustering.$k") || die "Error opening clustering output file.";
+		
+		my $clust = 0;
+		while($clust = <CO>)
+		{
+			# hash on the cluster# and append the observation# 
+			chomp($clust);
+			if(exists $hash{$clust})
+			{
+				$hash{$clust} .= " $lineNo";
+			}
+			else
+			{
+				$hash{$clust} = $lineNo;
+			}
+			
+			# increment the line number
+			$lineNo++;
+		}
+		
+		close CO;
+		
+		# Calculate the "Within Cluster Dispersion Measure / Error Measure" Wk 
+		# for given matrix and k value.
+		$W[$k] = &error_measure(\%hash);
+		
+		# for the graph plotting
+		$tmp_W[$k-1] = $W[$k];
+		$k[$k-1] = $k;
+		
+		unlink "$out_filename","$matrixfile.clustering.$k";	
     }
-
+	
     # For plotting of graph of log(Wk) vs. K
     my $my_graph = new GD::Graph::lines(600,480);
     
     $my_graph->set_title_font(gdGiantFont,24);
     $my_graph->set_x_label_font(gdGiantFont,14);
     $my_graph->set_y_label_font(gdGiantFont,14);
-    
+   
     $my_graph->set('x_label' => 'number of clusters k',
 		   'y_label' => 'log(Wk)',
 		   'title' => 'log(Wk) by k',
@@ -216,7 +271,7 @@ sub gap
 
     #~~~~~~~~~~~~~~~~~~~~ Step 2: Generation of Reference Model  ~~~~~~~~~~~~~~~~~~~~~~~~
 
-    my @W_M = ();
+    my @W_M = ();		# holds the reference distribution
 
     my @min = ();
     my @diff = ();
@@ -228,294 +283,360 @@ sub gap
     # 2 possible methods of generating reference distribution - uniform & proportional
     if($mtd eq "unif")
     {
-	# Repeat the complete Reference Distribution generation procedure B times.
-	for($i = 1; $i <= $B; $i++)
-	{
-	    my @refmat = ();
+		# Generate the Reference Distribution.
+		my @refmat = ();
 
-	    # initialize the reference matrix with "0"s.
-	    for($j = 0; $j < $rcnt; $j++)
-	    {
-		my @tmp_array = ((0) x $ccnt);
-		push @refmat, [ @tmp_array ]; 
-	    }
-
-	    # create the binary reference matrix using Uniform method
-	    for($n = 0; $n < $rcnt; $n++)
-	    {
-		$tmp_rmar = $rmar[$n];
-		while($tmp_rmar)
+		# initialize the reference matrix with "0"s.
+		for($j = 0; $j < $rcnt; $j++)
 		{
-		    $rand = rand($ccnt);      
-
-		    if(!$refmat[$n][$rand])
-		    {
-			$refmat[$n][$rand] = 1;
-			$tmp_rmar--;
-		    }
+			my @tmp_array = ((0) x $ccnt);
+			push @refmat, [ @tmp_array ]; 
 		}
-	    } #for n
-
-	    # Calculate Wk* from the generated reference matrix which consists of:
-	    # 1. Cluster the generated n observations
-	    # 2. Calculate the Wk*
-	    
-	    # Write the matrix to a temporary file
-	    my $filename = "tmp.ref." . time() . $i;
-	    open(RO,">$filename") || die "Error opening temporary file ($filename) in write mode.\n";
-	    
-	    my $ccnt = $#{$refmat[0]} + 1;
-
-	    print RO scalar(@refmat) ."	" . $ccnt  . "\n";
-
-	    for $j (@refmat)
-	    {
-		print RO "@$j\n";
-	    }
-	    
-	    close RO;
-
-	    # loop through K times
-	    for($k=1 ; $k<=$K ; $k++)
-	    {
-		# cluster the input matrix(nXm) i.e. cluster n observations into k clusters
-		my $out_filename = "tmp.ref.op." . $k . "." . time();
-		my $status = 0;
-		$status = system("vcluster --clmethod $clustmtd $filename $k >& $out_filename");
-		die "Error running vcluster \n" unless $status==0;
-		
-		# read the clustering output file
-		open(CO,"<$filename.clustering.$k") || die "Error opening clustering output file.";
-		
-		# initialize/clean the variables
-		my %hash = ();
-		my $lineNo = 0;
-		my $clust = 0;
-		
-		while($clust = <CO>)
+			
+		# create the binary reference matrix using Uniform method
+		for($n = 0; $n < $rcnt; $n++)
 		{
-		    # hash on the cluster# and append the observation# 
-		    chomp($clust);
-		    if(exists $hash{$clust})
-		    {
-			$hash{$clust} .= " $lineNo";
-		    }
-		    else
-		    {
-			$hash{$clust} = $lineNo;
-		    }
-		    
-		    # increment the line number
-		    $lineNo++;
+			$tmp_rmar = $rmar[$n];
+
+			while($tmp_rmar)
+			{
+				$rand = int(rand($ccnt));      
+				
+				if(!$refmat[$n][$rand])
+				{
+					$refmat[$n][$rand] = 1;
+					$tmp_rmar--;
+				}
+			}
+		} #for n
+
+		# calculate the pairwise distances for all possible unique pairs (n(n-1)/2) of the reference distribution
+		for($i = 0; $i < $rcnt; $i++)
+		{
+			# for all the rows in the cluster
+			for($j = 0; $j < $rcnt; $j++)
+			{
+				if($i == $j)
+				{
+					$d_ref[$i][$j] = 0;
+				}
+				else
+				{
+					@row1 = @{$refmat[$i]};
+					
+					@row2 = @{$refmat[$j]};
+					
+					$d_ref[$i][$j] = &$distfuncref(\@row1, \@row2);
+				}
+			}
 		}
-		
-		close CO;
 
-		$W_M[$i][$k] = &error_measure(\@refmat, \%hash);
-		
-		unlink "$out_filename","$filename.clustering.$k";
-	    }
-	    
-	    unlink "$filename", "$filename.tree";
+		# Perform Monte Carlo Sampling B times from the generated reference distribution to get B replicates
+		for($i = 1; $i <= $B; $i++)
+		{
+			my @replicate = ();		# holds the Bth replicate (Monte Carlo Sample of the reference distribution)
 
-	} # for $B
+			for($n = 0; $n < $rcnt; $n++)
+			{				
+				$rand = int(rand($rcnt));
+
+				$mapping[$n] = $rand;
+				push @replicate, $refmat[$rand];
+			}
+
+			# Calculate Wk* from the sampled replicate matrix which consists of:
+			# 1. Cluster the n observations
+			# 2. Calculate the Wk*
+			
+			# Write the matrix to a temporary file
+			my $filename = "tmp.ref." . time() . $i;
+			open(RO,">$filename") || die "Error opening temporary file ($filename) in write mode.\n";
+			
+			my $ccnt = $#{$replicate[0]} + 1;
+			
+			print RO scalar(@replicate) ."	" . $ccnt  . "\n";
+			
+			for $j (@replicate)
+			{
+				print RO "@$j\n";
+			}
+			
+			close RO;
+			
+			# loop through K times
+			for($k=1 ; $k<=$K ; $k++)
+			{
+				# cluster the input matrix(nXm) i.e. cluster n observations into k clusters
+				my $out_filename = "tmp.ref.op." . $k . "." . time();
+				my $status = 0;
+				$status = system("vcluster --clmethod $clustmtd $filename $k >& $out_filename");
+				die "Error running vcluster \n" unless $status==0;
+				
+				# read the clustering output file
+				open(CO,"<$filename.clustering.$k") || die "Error opening clustering output file.";
+				
+				# initialize/clean the variables
+				my %hash = ();
+				my $lineNo = 0;
+				my $clust = 0;
+				
+				while($clust = <CO>)
+				{
+					# hash on the cluster# and append the observation# 
+					chomp($clust);
+					if(exists $hash{$clust})
+					{
+						$hash{$clust} .= " $lineNo";
+					}
+					else
+					{
+						$hash{$clust} = $lineNo;
+					}
+					
+					# increment the line number
+					$lineNo++;
+				}
+				
+				close CO;
+
+				$W_M[$i][$k] = &error_measure_ref(\%hash);
+
+				unlink "$out_filename","$filename.clustering.$k";
+			}
+			
+			unlink "$filename", "$filename.tree";
+			
+		} # for $B
+
     }
     else # proportional
     {
-	# calculate the range for each feature
-	my @lower = ();
-	my @upper = ();
-
-	my $index = 0;
-	my $hold = 0;
-	my %hash_col = ();
-
-	# sort the array of col marginals in ascending order
-	# to minimize the the adjustment of ranges which is 
-	# needed after a random number is assigned to a feature
-	@cmar = sort {$a <=> $b} (@cmar);
-
-	# create the ranges for all the features
-	for($c = 0; $c <= $#cmar; $c++)
-	{
-	    if($cmar[$c])
-	    {
-		$lower[$index] = $hold + 1;
-		$upper[$index] = $hold + $cmar[$c];
-		$hold = $upper[$index];
-
-		# to take care of the situations where a col 
-		# marginal for a feature is zero.
-		$hash_col{$index} = $c;
-		$index++;
-	    }
-	}
-
-	# Repeat the complete Reference Distribution generation procedure B times. 
-	for($i = 1; $i <= $B; $i++)
-	{
-	    my @refmat = ();
-
-	    # initialize the reference matrix with "0"s.
-	    for($j = 0; $j < $rcnt; $j++)
-	    {
-		my @tmp_array = ((0) x $ccnt);
-		push @refmat, [ @tmp_array ]; 
-	    }
-
-	    # create the binary reference matrix using Proportional method
-	    for($n = 0; $n < $rcnt; $n++)
-	    {
-		$tmp_rmar = $rmar[$n];
-
-		# copy the ranges to temp array
-		# because these temp ranges will
-		# be adjusted after every random
-		# number is assigned to a feature
-		my @tmp_low = @lower;
-		my @tmp_upp = @upper;
-		my $temp_totalElem = $totalElem;
-		my $prev_ans = scalar(@cmar);
-
-		# repeat row marginal times
-		while($tmp_rmar)
+		# calculate the range for each feature
+		my @lower = ();
+		my @upper = ();
+		
+		my $index = 0;
+		my $hold = 0;
+		my %hash_col = ();
+		
+		# sort the array of col marginals in ascending order
+		# to minimize the the adjustment of ranges which is 
+		# needed after a random number is assigned to a feature
+		@cmar = sort {$a <=> $b} (@cmar);
+		
+		# create the ranges for all the features
+		for($c = 0; $c <= $#cmar; $c++)
 		{
-		    # translate the random generated over [0,$temp_totalElem-1]
-		    # to [1,$temp_totalElem]
-		    $rand = rand($temp_totalElem);
-		    $rand++;
-
-		    # find the feature# to which this random number belongs to.
-		    # using binary search
-		    my $min = 0;
-		    my $max = $#tmp_upp;
-		    my $col = 0;
-		    
-		    my $feat_ind = 0;
-
-		    while($min <= $max)
-		    {
-			$col = floor(($min + $max)/2);
-
-			if($rand == $tmp_upp[$col])
+			if($cmar[$c])
 			{
-			    $feat_ind = $hash_col{$col};
-			    if($prev_ans <= $feat_ind)
-			    {
-				$feat_ind++;
-			    }
-			    $prev_ans = $feat_ind;
-			    last;
+				$lower[$index] = $hold + 1;
+				$upper[$index] = $hold + $cmar[$c];
+				$hold = $upper[$index];
+				
+				# to take care of the situations where a col 
+				# marginal for a feature is zero.
+				$hash_col{$index} = $c;
+				$index++;
 			}
-			elsif($rand < $tmp_upp[$col])
-			{
-			    if($rand >= $lower[$col])
-			    {
-				$feat_ind = $hash_col{$col};
-				if($prev_ans <= $feat_ind)
-				{
-				    $feat_ind++;
-				}
-				$prev_ans = $feat_ind;
-				last;
-			    }
-			    else
-			    {
-				$max = $col - 1;
-			    }
-			}
-			else
-			{
-			    $min = $col + 1;
-			}
-		    } #while
-
-		    $refmat[$n][$feat_ind] = 1;
-		    $tmp_rmar--;
-		    
-		    # adjust the ranges
-		    my $tmp_ans = $feat_ind;
-		    while($tmp_ans < $#tmp_low )
-		    {
-			$tmp_low[$tmp_ans] = $tmp_low[$tmp_ans+1] - $cmar[$feat_ind];
-			$tmp_upp[$tmp_ans] = $tmp_upp[$tmp_ans+1] - $cmar[$feat_ind];			
-			$tmp_ans++;
-		    }
-		    
-		    $temp_totalElem = $temp_totalElem - $cmar[$feat_ind];
-
-		    $tmp_low[$#tmp_low] = undef;
-		    $tmp_upp[$#tmp_upp] = undef;
-		    $#tmp_low = $#tmp_low - 1;
-		    $#tmp_upp = $#tmp_upp - 1;
-		} # while
-	    } #for n
-
-	    # Calculate Wk* from the generated reference matrix which consists of:
-	    # 1. Cluster the generated n observations
-	    # 2. Calculate the Wk*
-	    
-	    # Write the matrix to a temporary file
-	    my $filename = "tmp.ref." . time() . $i;
-	    open(RO,">$filename") || die "Error opening temporary file ($filename) in write mode.\n";
-	    
-	    my $ccnt = $#{$refmat[0]} + 1;
-
-	    print RO scalar(@refmat) ."	" . $ccnt  . "\n";
-
-	    for $j (@refmat)
-	    {
-		print RO "@$j\n";
-	    }
-	    
-	    close RO;
-	    
-	    # loop through K times
-	    for($k=1 ; $k<=$K ; $k++)
-	    {
-		# cluster the input matrix(nXm) i.e. cluster n observations into k clusters
-		my $out_filename = "tmp.ref.op." . $k . "." . time();
-		my $status = 0;
-		$status = system("vcluster --clmethod $clustmtd $filename $k >& $out_filename");
-		die "Error running vcluster \n" unless $status==0;
-		
-		# read the clustering output file
-		open(CO,"<$filename.clustering.$k") || die "Error opening clustering output file.";
-		
-		# initialize/clean the variables
-		my %hash = ();
-		my $lineNo = 0;
-		my $clust = 0;
-		
-		while($clust = <CO>)
-		{
-		    # hash on the cluster# and append the observation# 
-		    chomp($clust);
-		    if(exists $hash{$clust})
-		    {
-			$hash{$clust} .= " $lineNo";
-		    }
-		    else
-		    {
-			$hash{$clust} = $lineNo;
-		    }
-		    
-		    # increment the line number
-		    $lineNo++;
 		}
 		
-		close CO;
-		
-		$W_M[$i][$k] = &error_measure(\@refmat, \%hash);
-		
-		unlink "$out_filename","$filename.clustering.$k";
-	    }
-	    
-	    unlink "$filename", "$filename.tree";
+		# Generate the Reference Distribution
+		my @refmat = ();
+			
+		# initialize the reference matrix with "0"s.
+		for($j = 0; $j < $rcnt; $j++)
+		{
+			my @tmp_array = ((0) x $ccnt);
+			push @refmat, [ @tmp_array ]; 
+		}
+			
+		# create the binary reference matrix using Proportional method
+		for($n = 0; $n < $rcnt; $n++)
+		{
+			$tmp_rmar = $rmar[$n];
+			
+			# copy the ranges to temp array
+			# because these temp ranges will
+			# be adjusted after every random
+			# number is assigned to a feature
+			my @tmp_low = @lower;
+			my @tmp_upp = @upper;
+			my $temp_totalElem = $totalElem;
+			my $prev_ans = scalar(@cmar);
+			
+			# repeat row marginal times
+			while($tmp_rmar)
+			{
+				# translate the random generated over [0,$temp_totalElem-1]
+				# to [1,$temp_totalElem]
+				$rand = int(rand($temp_totalElem));
+				$rand++;
+				
+				# find the feature# to which this random number belongs to.
+				# using binary search
+				my $min = 0;
+				my $max = $#tmp_upp;
+				my $col = 0;
+				
+				my $feat_ind = 0;
+				
+				while($min <= $max)
+				{
+					$col = floor(($min + $max)/2);
+					
+					if($rand == $tmp_upp[$col])
+					{
+						$feat_ind = $hash_col{$col};
+						if($prev_ans <= $feat_ind)
+						{
+							$feat_ind++;
+						}
+						$prev_ans = $feat_ind;
+						last;
+					}
+					elsif($rand < $tmp_upp[$col])
+					{
+						if($rand >= $lower[$col])
+						{
+							$feat_ind = $hash_col{$col};
+							if($prev_ans <= $feat_ind)
+							{
+								$feat_ind++;
+							}
+							$prev_ans = $feat_ind;
+							last;
+						}
+						else
+						{
+							$max = $col - 1;
+						}
+					}
+					else
+					{
+						$min = $col + 1;
+					}
+				} #while
+				
+				$refmat[$n][$feat_ind] = 1;
+				$tmp_rmar--;
+				
+				# adjust the ranges
+				my $tmp_ans = $feat_ind;
+				while($tmp_ans < $#tmp_low )
+				{
+					$tmp_low[$tmp_ans] = $tmp_low[$tmp_ans+1] - $cmar[$feat_ind];
+					$tmp_upp[$tmp_ans] = $tmp_upp[$tmp_ans+1] - $cmar[$feat_ind];			
+					$tmp_ans++;
+				}
+				
+				$temp_totalElem = $temp_totalElem - $cmar[$feat_ind];
+				
+				$tmp_low[$#tmp_low] = undef;
+				$tmp_upp[$#tmp_upp] = undef;
+				$#tmp_low = $#tmp_low - 1;
+				$#tmp_upp = $#tmp_upp - 1;
+			} # while
+		} #for n
 
-	} # for $B
+		# calculate the pairwise distances for all possible unique pairs (n(n-1)/2) of the reference distribution
+		for($i = 0; $i < $rcnt; $i++)
+		{
+			# for all the rows in the cluster
+			for($j = 0; $j < $rcnt; $j++)
+			{
+				if($i == $j)
+				{
+					$d_ref[$i][$j] = 0;
+				}
+				else
+				{
+					@row1 = @{$refmat[$i]};
+					
+					@row2 = @{$refmat[$j]};
+					
+					$d_ref[$i][$j] = &$distfuncref(\@row1, \@row2);
+				}
+			}
+		}
+
+		# Perform Monte Carlo Sampling B times from the generated distribution
+		for($i = 1; $i <= $B; $i++)
+		{
+			my @replicate = ();
+
+			for($n = 0; $n < $rcnt; $n++)
+			{				
+				$rand = int(rand($rcnt));
+
+				$mapping[$n] = $rand;
+				push @replicate, $refmat[$rand];
+			}
+		
+			# Calculate Wk* from the Bth replicate which consists of:
+			# 1. Cluster the generated n observations
+			# 2. Calculate the Wk*
+			
+			# Write the matrix to a temporary file
+			my $filename = "tmp.ref." . time() . $i;
+			open(RO,">$filename") || die "Error opening temporary file ($filename) in write mode.\n";
+			
+			my $ccnt = $#{$replicate[0]} + 1;
+			
+			print RO scalar(@replicate) ."	" . $ccnt  . "\n";
+			
+			for $j (@replicate)
+			{
+				print RO "@$j\n";
+			}
+			
+			close RO;
+			
+			# loop through K times
+			for($k=1 ; $k<=$K ; $k++)
+			{
+				# cluster the input matrix(nXm) i.e. cluster n observations into k clusters
+				my $out_filename = "tmp.ref.op." . $k . "." . time();
+				my $status = 0;
+				$status = system("vcluster --clmethod $clustmtd $filename $k >& $out_filename");
+				die "Error running vcluster \n" unless $status==0;
+				
+				# read the clustering output file
+				open(CO,"<$filename.clustering.$k") || die "Error opening clustering output file.";
+				
+				# initialize/clean the variables
+				my %hash = ();
+				my $lineNo = 0;
+				my $clust = 0;
+				
+				while($clust = <CO>)
+				{
+					# hash on the cluster# and append the observation# 
+					chomp($clust);
+					if(exists $hash{$clust})
+					{
+						$hash{$clust} .= " $lineNo";
+					}
+					else
+					{
+						$hash{$clust} = $lineNo;
+					}
+					
+					# increment the line number
+					$lineNo++;
+				}
+				
+				close CO;
+		   
+				$W_M[$i][$k] = &error_measure_ref(\%hash);
+
+				unlink "$out_filename","$filename.clustering.$k";
+			}
+			
+			unlink "$filename", "$filename.tree";
+			
+		} # for $B
     }# else "proportional"
-
+		
     my @sum = ();
     my @gap = ();
 
@@ -526,18 +647,19 @@ sub gap
     my @tmp_gap = ();
     for($i = 1; $i <= $K; $i++)
     {
-	for($j = 1; $j <= $B; $j++)
-	{
-	    $sum[$i] += $W_M[$j][$i];
-	}
+		for($j = 1; $j <= $B; $j++)
+		{
+			$sum[$i] += $W_M[$j][$i];
+		}
 	
-	$sum[$i] = sprintf("%.4f",$sum[$i]/$B) + 0;
-	# Calculate Gap(k) = 1/B(summationOverB(log(Wkb*))) - log(Wk)
-	$gap[$i] = sprintf("%.4f", $sum[$i] - $W[$i]) + 0;
-	
-	# for the graph
-	$tmp_gap[$i-1] = $gap[$i];
-	$E_W[$i-1] = $sum[$i];
+		$sum[$i] = sprintf("%.4f",$sum[$i]/$B) + 0;
+
+		# Calculate Gap(k) = 1/B(summationOverB(log(Wkb*))) - log(Wk)
+		$gap[$i] = sprintf("%.4f", $sum[$i] - $W[$i]) + 0;
+		
+		# for the graph
+		$tmp_gap[$i-1] = $gap[$i];
+		$E_W[$i-1] = $sum[$i];
     }
 
 
@@ -568,16 +690,16 @@ sub gap
     # Calculate standard deviation sd for Wk*
     for($i = 1; $i <= $K; $i++)
     {
-	for($j = 1; $j <= $B; $j++)
-	{
-	    $sd[$i] += ($W_M[$j][$i] - $sum[$i])**2;
-	}
-	
-	$sd[$i] = sprintf("%.4f",sqrt($sd[$i]/$B)) + 0;
-	# Calculate the modified standard deviation to account for 
-	# simulation error.
-	$s[$i] = $sd[$i] * sqrt(1 + 1/$B);
-	$s[$i] = sprintf("%.4f",$s[$i]) + 0;
+		for($j = 1; $j <= $B; $j++)
+		{
+			$sd[$i] += ($W_M[$j][$i] - $sum[$i])**2;
+		}
+		
+		$sd[$i] = sprintf("%.4f",sqrt($sd[$i]/$B)) + 0;
+		# Calculate the modified standard deviation to account for 
+		# simulation error.
+		$s[$i] = $sd[$i] * sqrt(1 + 1/$B);
+		$s[$i] = sprintf("%.4f",$s[$i]) + 0;
     }
 
     my $ans = 1;
@@ -589,20 +711,11 @@ sub gap
     # Gap(k) >= Gap(k+1) - s(k+1)
     for($i = 1; $i < $K; $i++)
     {
-	if($gap[$i+1] < 0)
-	{
-	    $tmp = $gap[$i+1] + $s[$i+1];
-	}
-	else
-	{
-	    $tmp = $gap[$i+1] - $s[$i+1];
-	}
-
-	if($gap[$i] >= $tmp)
-	{
-	    $ans = $i;
-	    last;
-	}
+		if($gap[$i] >= ($gap[$i+1] - $s[$i+1]))
+		{
+			$ans = $i;
+			last;
+		}
     }
 
     # For plotting of graph of Gap vs. K    
@@ -628,58 +741,56 @@ sub gap
     my $alpha = 0;
     my $low_conf_int = 0;
     my $upp_conf_int = 0;
-    my @tmp = ();
+    @tmp = ();
 
     printf LO "%3s  %10s  %10s  %10s  %10s  %10s  %30s\n", "K", "Gap(k)", "log(W(k))", "log(W*(k))", "sd(k)", "s(k)", "$perc% Confidence Intervals";   
     printf LO "-" x 95 ."\n";
     for($i = 1; $i <= $K; $i++)
     {
-	# Calculate a from 100(1-2a) = %
-	$alpha = (1 - $perc/100)/2;
-
-	for($j = 1; $j <= $B; $j++)
-	{
-	    $tmp[$j-1] = $W_M[$j][$i];
-	}
-	# sort in the numeric ascending order 
-	@tmp = sort {$a <=> $b} (@tmp);    
-	
-	# Calculate lower bound = average of W*[floor(B*a)] and W*[ceil(B*a)]
-	$low_conf_int = ($tmp[floor($B*$alpha)-1] + $tmp[ceil($B*$alpha)-1])/2;
-	
-	# Calculate upper bound = average of W*[floor(B*(1-a))] and W*[ceil(B*(1-a))]
-	$upp_conf_int = ($tmp[floor($B*(1-$alpha))-1] + $tmp[ceil($B*(1-$alpha))-1])/2;
-	
-	printf LO "%3d  %10.4f  %10.4f  %10.4f  %10.4f  %10.4f  %30s\n", $i, $gap[$i], $W[$i], $sum[$i], $sd[$i], $s[$i], "$low_conf_int - $upp_conf_int";
+		# Calculate a from 100(1-2a) = %
+		$alpha = (1 - $perc/100)/2;
+		
+		for($j = 1; $j <= $B; $j++)
+		{
+			$tmp[$j-1] = $W_M[$j][$i];
+		}
+		# sort in the numeric ascending order 
+		@tmp = sort {$a <=> $b} (@tmp);    
+		
+		# Calculate lower bound = average of W*[floor(B*a)] and W*[ceil(B*a)]
+		$low_conf_int = ($tmp[floor($B*$alpha)-1] + $tmp[ceil($B*$alpha)-1])/2;
+		
+		# Calculate upper bound = average of W*[floor(B*(1-a))] and W*[ceil(B*(1-a))]
+		$upp_conf_int = ($tmp[floor($B*(1-$alpha))-1] + $tmp[ceil($B*(1-$alpha))-1])/2;
+		
+		printf LO "%3d  %10.4f  %10.4f  %10.4f  %10.4f  %10.4f  %30s\n", $i, $gap[$i], $W[$i], $sum[$i], $sd[$i], $s[$i], "$low_conf_int - $upp_conf_int";
     }
 
     print LO "\nIndividual Dispersion values:\n";
     for($i = 1; $i <= $K; $i++)
     {
-	print LO "K=$i\n";
-	printf LO "%3s  %10s\n", "B", "log(W*)"; 
-	printf LO "-" x 15 . "\n"; 
-	for($j = 1; $j <= $B; $j++)
-	{
-	    $tmp[$j-1] = $W_M[$j][$i];
-	    printf LO "%3s  %10s\n", "$j", "$W_M[$j][$i]"; 
-	}
-	print LO "\n";
+		print LO "K=$i\n";
+		printf LO "%3s  %10s\n", "B", "log(W*)"; 
+		printf LO "-" x 15 . "\n"; 
+		for($j = 1; $j <= $B; $j++)
+		{
+			$tmp[$j-1] = $W_M[$j][$i];
+			printf LO "%3s  %10s\n", "$j", "$W_M[$j][$i]"; 
+		}
+		print LO "\n";
     }
-
+	
     close LO;
-
 
     print "$ans\n";
     return $ans;
 }
 
 
-# Calculates the "Within Cluster Dispersion / Error Measure (Wk)"
+# Calculates the "Within Cluster Dispersion / Error Measure (Wk)" for the observed data
 sub error_measure
 {
     # arguments
-    my @matrix = @{(shift)};
     my %clustout = %{(shift)};
 
     #local variables
@@ -696,38 +807,88 @@ sub error_measure
     # for each cluster
     foreach $key (keys %clustout)
     {
-	$D[$key] = 0;
-
-	@rownum = split(/\s+/,$clustout{$key});
-
-	# for each instance in the cluster
-	for($i = 0; $i < $#rownum; $i++)
-	{
-	    # for all the rows in the cluster
-	    for($j = $i+1; $j <= $#rownum; $j++)
-	    {
-		# find the distance between the 2 rows of the matrix.
-		$row1 = $rownum[$i];
-		$row2 = $rownum[$j];
-
-		# store the Dr value
-		if(exists $d[$row1][$row2])
+		$D[$key] = 0;
+		
+		@rownum = split(/\s+/,$clustout{$key});
+		
+		# for each instance in the cluster
+		for($i = 0; $i < $#rownum; $i++)
 		{
-		    $D[$key] += $d[$row1][$row2];
+			# for all the rows in the cluster
+			for($j = $i+1; $j <= $#rownum; $j++)
+			{
+				# find the distance between the 2 rows of the matrix.
+				$row1 = $rownum[$i];
+				$row2 = $rownum[$j];
+				
+				# store the Dr value
+				if(exists $d[$row1][$row2])
+				{
+					$D[$key] += $d[$row1][$row2];
+				}
+				else
+				{
+					$D[$key] += $d[$row2][$row1];
+				}
+			}
 		}
-		else
-		{
-		    $D[$key] += $d[$row2][$row1];
-		}
-	    }
-	}
+		
+		$W += (1/($#rownum + 1)) * $D[$key];
+    }
+	
+    if($W != 0)
+    {
+		$W = sprintf("%.4f", log($W)/log(10)) + 0;
+    }
 
-	$W += (1/($#rownum + 1)) * $D[$key];
+    return $W;
+}
+
+# Calculates the "Within Cluster Dispersion / Error Measure (Wk)" for the reference replicates
+sub error_measure_ref
+{
+    # arguments
+    my %clustout = %{(shift)};
+
+    #local variables
+    my $i; 
+    my $j;
+    my @rownum;
+    my $key;
+    my $row1;
+    my $row2;
+    my $W = 0;
+    my @D = ();
+    my $tmp;
+
+    # for each cluster
+    foreach $key (keys %clustout)
+    {
+		$D[$key] = 0;
+		
+		@rownum = split(/\s+/,$clustout{$key});
+
+		# for each instance in the cluster
+		for($i = 0; $i <= $#rownum; $i++)
+		{
+			# for all the rows in the cluster
+			for($j = $i+1; $j <= $#rownum; $j++)
+			{
+				# find the distance between the 2 rows of the matrix.
+				$row1 = $mapping[$rownum[$i]];
+				$row2 = $mapping[$rownum[$j]];
+				
+				# store the Dr value
+				$D[$key] += $d_ref[$row1][$row2];
+			}
+		}
+
+		$W += (1/(2 * ($#rownum + 1))) * $D[$key];
     }
 
     if($W != 0)
     {
-	$W = sprintf("%.4f", log($W)/log(10)) + 0;
+		$W = sprintf("%.4f", log($W)/log(10)) + 0;
     }
 
     return $W;
@@ -820,7 +981,7 @@ __END__
  use Statistics::Gap;
  &gap("GapPrefix", "InputFile", "squared", "agglo", 5, 100, "prop", 90);
 
- Input file is expected in the "dense" format -
+ Input file is can be in the "dense" format -
  Sample Input file:
    
  6 5
@@ -830,6 +991,19 @@ __END__
  1       1       0       0       1
  1       0       0       0       1
  1       1       0       0       1 	  	
+
+ OR in "sparse" format -
+ Sample Input file:
+
+ 8 10 41
+ 1 1 4 1 8 1 10 1
+ 1 1 2 1 3 1 5 1 7 1 9 1
+ 2 1 3 1 4 1 5 1 7 1 9 1
+ 2 1 4 1 5 1 9 1
+ 1 1 4 1 6 1
+ 1 1 2 1 3 1 4 1 5 1 6 1 10 1
+ 2 1 4 1 5 1 7 1 8 1 10 1
+ 2 1 4 1 7 1 9 1 10 1
 
 =head1 DESCRIPTION
 
@@ -872,13 +1046,13 @@ intermediate files and the .png files (graph files).
 
 =head2 InputFile
 
-The input dataset is expected in "dense" matrix format.
-The input dense matrix is expected in a plain text file where the first
+The input dataset can be in "dense" or "sparse" matrix format.
+The input matrix is expected in a plain text file where the first
 line in the file gives the dimensions of the dataset and then the 
-dataset in a matrix format should follow. The contexts / observations 
+dataset in either of the format should follow. The contexts / observations 
 should be along the rows and the features should be along the column.
 
-	eg:
+	eg: dense format - 
       	6 5
         1       1       0       0       1
         1       0       0       0       0
@@ -889,10 +1063,31 @@ should be along the rows and the features should be along the column.
 
 The first line (6 5) gives the number of rows (observations) and the 
 number of columns (features) present in the following matrix.
-Following each line records the frequency of occurrence of the feature
+Each following line/row records the presence (1) or absence (0) of the feature
 at the column in the given observation. Thus features1 (1st column) occurs
 once in the observation1 and infact once in all the other observations too 
 while the feature3 does not occur in observation1.
+
+	eg: sparse format -
+		8 10 41
+		1 1 4 1 8 1 10 1
+		1 1 2 1 3 1 5 1 7 1 9 1
+		2 1 3 1 4 1 5 1 7 1 9 1
+		2 1 4 1 5 1 9 1
+		1 1 4 1 6 1
+		1 1 2 1 3 1 4 1 5 1 6 1 10 1
+		2 1 4 1 5 1 7 1 8 1 10 1
+		2 1 4 1 7 1 9 1 10 1
+
+The first line (8 10 41) gives the number of rows (observations), the 
+number of columns (features) and the number of non-zero elements present 
+in the following matrix. Each of the following line/row consists of pair of
+values where the first number in the pair gives the column number corresponding
+to the feature that occurs in the observation corresponding to the row. In this 
+format only features that are present/observed (1) are recorded i.e. the features 
+that are absent/not-observed (0) are implied. Thus in the 1st row (observation1) 
+of the above matrix only features1, feature4, feature8 and feature10 occur while 
+the other 7 features do not occur.
 
 =head2  DistanceMeasure
 
@@ -920,7 +1115,8 @@ into 3 clusters this value should be set some integer value greater than 3.
 
 =head2  B value
 
-Specifies the number of time the reference distribution should be generated.
+Specifies the number of replicates that should be sampled from the generated 
+reference distribution using Monte Carlo Sampling.
 
 =head2  ReferenceGenerationMethod
 
@@ -977,7 +1173,7 @@ CLUTO can be downloaded from http://www-users.cs.umn.edu/~karypis/cluto/
 
 =head1 COPYRIGHT AND LICENSE
 
-Copyright (C) 2005-2006, Guergana Savova and Anagha Kulkarni
+Copyright (C) 2006-2008, Anagha Kulkarni and Guergana Savova
 
 This program is free software; you can redistribute it and/or
 modify it under the terms of the GNU General Public License

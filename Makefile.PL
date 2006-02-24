@@ -6,7 +6,7 @@ use ExtUtils::MakeMaker;
 
 WriteMakefile(
     NAME              => 'Statistics::Gap',
-    VERSION	      => '0.05',
+    VERSION	      => '0.06',
     VERSION_FROM      => 'lib/Statistics/Gap.pm',
     PREREQ_PM         => {GD => 2.19,
 			  GD::Text => 0.86,
