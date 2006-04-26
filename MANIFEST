@@ -3,11 +3,12 @@ INSTALL
 Makefile.PL
 MANIFEST
 README
-ToDo
 t/2_senses.t
 t/2_senses
-t/4_senses.t
-t/4_senses
+t/3_senses.t
+t/3_senses
+t/8_senses.t
+t/8_senses
 t/mix.t
 t/mix
 lib/Statistics/Gap.pm
