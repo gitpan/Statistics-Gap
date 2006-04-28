@@ -15,7 +15,7 @@ EOM
 
 WriteMakefile(
     NAME              => 'Statistics::Gap',
-    VERSION	      => '0.08',
+    VERSION	      => '0.09',
     VERSION_FROM      => 'lib/Statistics/Gap.pm',
 	PREREQ_PM         => {'Algorithm::RandomMatrixGeneration' => '0.02',
 					  'Math::BigFloat' => '1.44'},

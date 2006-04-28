@@ -41,3 +41,8 @@ Revision history for Perl extension Statistics::Gap.
     - Instead of generating *.png files now provides the data
       required for plot generation in *.dat files.
     - Supports both, vector space and similiarity space.
+
+0.09 Fri Apr 28 2006
+	- Corrected a bug (about column index)
+	- Instead of 4 plot files (*.dat) now only 3 plot files are created - removed a redundant file. Also renamed the files.
+	

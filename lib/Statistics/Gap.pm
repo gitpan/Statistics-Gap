@@ -14,7 +14,7 @@ our @ISA = qw(Exporter);
 
 our @EXPORT = qw( gap );
 
-our $VERSION = '0.08';
+our $VERSION = '0.09';
 
 # Estimates the number of clusters that a given data naturally falls into
 sub gap
@@ -115,7 +115,8 @@ sub gap
 				for(my $i=0; $i<$#tmp; $i=$i+2)
 				{
 					$rmar[$row] += $tmp[$i+1];
-					$cmar[$tmp[$i]] += $tmp[$i+1];
+					my $tmp_col = $tmp[$i] - 1;
+					$cmar[$tmp_col] += $tmp[$i+1];					
 				}
 				
 				$row++;
@@ -160,9 +161,6 @@ sub gap
 
     my @W = ();   # holds the crfun values for various k values
 
-	# plot file
-	open(G2,">$prefix.fig2.dat") || die "Error creating $prefix.fig2.dat file\n";
-
     # loop through K times
     for(my $k=1; $k<=$K; $k++)
     {
@@ -194,14 +192,9 @@ sub gap
 		$str =~ /\-way clustering: \[.*=(.*?)\]/;
 		$W[$k] = $1;
 
-		# for the graph plotting
-		print G2 "$k $W[$k]\n";
-		
 		unlink "$out_filename","$matrixfile.clustering.$k";
     }
 	
-	close G2;
-
 
     #~~~~~~~~~~~~~~~~~~~~ Step 2: Generation of Reference Model  ~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -412,8 +405,8 @@ sub gap
 	} #else typeref = ref
 
 	# For plots
-	open(G3a,">$prefix.fig3a.dat") || die "Error creating $prefix.fig3a.dat file\n";
-	open(G3b,">$prefix.fig3b.dat") || die "Error creating $prefix.fig3b.dat file\n";
+	open(G3a,">$prefix.exp.dat") || die "Error creating $prefix.exp.dat file\n";
+	open(G3b,">$prefix.obs.dat") || die "Error creating $prefix.obs.dat file\n";
 
     my @sum = ();
     my @gap = ();
@@ -447,7 +440,7 @@ sub gap
 	my $upper = 0;
 
 	# For plot
-	open(G4,">$prefix.fig4.dat") || die "Error creating $prefix.fig4.dat file\n";
+	open(G4,">$prefix.gap.dat") || die "Error creating $prefix.gap.dat file\n";
 
     # Calculate standard deviation sd for crfun(exp)
     for(my $i = 1; $i <= $K; $i++)
@@ -704,7 +697,7 @@ estimate of number of clusters present in the input dataset.
 The first table in the file gives values like Gap(k), obs(crfun(k)) etc. for every k value
 experimented with.	
 
-3. The prefix.fig*.dat files are provided to facilitate generation of plots of the observed 
+3. The prefix.*.dat files are provided to facilitate generation of plots of the observed 
 distribution, expected distribution and gap(k), if desired.
 
 =head1 DESCRIPTION

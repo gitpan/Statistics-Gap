@@ -141,7 +141,7 @@ OOUUTTPPUUTT
        ferent K values.  The first table in the file gives values like Gap(k),
        obs(crfun(k)) etc. for every k value experimented with.
 
-       3. The prefix.fig*.dat files are provided to facilitate generation of
+       3. The prefix.*.dat files are provided to facilitate generation of
        plots of the observed distribution, expected distribution and gap(k),
        if desired.
 
@@ -236,4 +236,4 @@ CCOOPPYYRRIIGGHHTT AANNDD LLIICCEENNSSEE
 
 
 
-perl v5.8.5                       2006-04-26                Statistics::Gap(3)
+perl v5.8.5                       2006-04-28                Statistics::Gap(3)
