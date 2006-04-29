@@ -1,5 +1,5 @@
-# 2_sense.t version 0.02
-# (Updated 04/26/2006 -- Anagha)
+# 2_sense.t version 0.03
+# (Updated 04/28/2006 -- Anagha)
 #
 # A script to run tests on the Statistics::Gap module.
 # This test cases check for 2 sense input matrix.
@@ -10,7 +10,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 5;
 
 BEGIN { use_ok('Statistics::Gap') };
 
@@ -31,42 +31,24 @@ else
 	is("does not exist pre_2.gap.log","exist");
 }
 
-if(-e "pre_2.fig2.dat")
+if(-e "pre_2.obs.dat")
 {
 	is("exists","exists");
 }
 else
 {
-	is("does not exist fig2","exist");
+	is("does not exist obs","exist");
 }
 
-if(-e "pre_2.fig3a.dat")
+if(-e "pre_2.exp.dat")
 {
 	is("exists","exists");
 }
 else
 {
-	is("does not exist fig3a","exist");
+	is("does not exist exp","exist");
 }
 
-if(-e "pre_2.fig3b.dat")
-{
-	is("exists","exists");
-}
-else
-{
-	is("does not exist fig3b","exist");
-}
-
-if(-e "pre_2.fig4.dat")
-{
-	is("exists","exists");
-}
-else
-{
-	is("does not exist fig4","exist");
-}
-
-unlink "pre_2.gap.log", "pre_2.fig2.dat","pre_2.fig3a.dat","pre_2.fig3b.dat","pre_2.fig4.dat";
+unlink "pre_2.gap.log", "pre_2.obs.dat","pre_2.exp.dat","pre_2.gap.dat";
 
 __END__

@@ -10,7 +10,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 5;
 
 BEGIN { use_ok('Statistics::Gap') };
 
@@ -31,42 +31,24 @@ else
 	is("does not exist pre_8.gap.log","exist");
 }
 
-if(-e "pre_8.fig2.dat")
+if(-e "pre_8.obs.dat")
 {
 	is("exists","exists");
 }
 else
 {
-	is("does not exist fig2","exist");
+	is("does not exist obs","exist");
 }
 
-if(-e "pre_8.fig3a.dat")
+if(-e "pre_8.exp.dat")
 {
 	is("exists","exists");
 }
 else
 {
-	is("does not exist fig3a","exist");
+	is("does not exist exp","exist");
 }
 
-if(-e "pre_8.fig3b.dat")
-{
-	is("exists","exists");
-}
-else
-{
-	is("does not exist fig3b","exist");
-}
-
-if(-e "pre_8.fig4.dat")
-{
-	is("exists","exists");
-}
-else
-{
-	is("does not exist fig4","exist");
-}
-
-unlink "pre_8.gap.log", "pre_8.fig2.dat","pre_8.fig3a.dat","pre_8.fig3b.dat","pre_8.fig4.dat";
+unlink "pre_8.gap.log", "pre_8.obs.dat","pre_8.exp.dat","pre_8.gap.dat";
 
 __END__

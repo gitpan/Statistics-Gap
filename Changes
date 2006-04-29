@@ -46,3 +46,5 @@ Revision history for Perl extension Statistics::Gap.
 	- Corrected a bug (about column index)
 	- Instead of 4 plot files (*.dat) now only 3 plot files are created - removed a redundant file. Also renamed the files.
 	
+0.10 Sat Apr 29 2006
+    - Corrected the test files.

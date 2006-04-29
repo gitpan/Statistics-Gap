@@ -1,5 +1,5 @@
-# 2_sense.t version 0.01
-# (Updated 08/13/2005 -- Anagha)
+# 2_sense_sim.t version 0.02
+# (Updated 04/29/2006 -- Anagha)
 #
 # A script to run tests on the Statistics::Gap module.
 # This test cases check for 2 sense input matrix.
@@ -10,7 +10,7 @@
 use strict;
 use warnings;
 
-use Test::More tests => 7;
+use Test::More tests => 5;
 
 BEGIN { use_ok('Statistics::Gap') };
 
@@ -28,45 +28,27 @@ if(-e "pre_2_sim.gap.log")
 }
 else
 {
-	is("does not exist pre_2_sim.gap.log","exist");
+	is("does not exist pre_2_sim_sim.gap.log","exist");
 }
 
-if(-e "pre_2_sim.fig2.dat")
+if(-e "pre_2_sim.obs.dat")
 {
 	is("exists","exists");
 }
 else
 {
-	is("does not exist fig2","exist");
+	is("does not exist obs","exist");
 }
 
-if(-e "pre_2_sim.fig3a.dat")
+if(-e "pre_2_sim.exp.dat")
 {
 	is("exists","exists");
 }
 else
 {
-	is("does not exist fig3a","exist");
+	is("does not exist exp","exist");
 }
 
-if(-e "pre_2_sim.fig3b.dat")
-{
-	is("exists","exists");
-}
-else
-{
-	is("does not exist fig3b","exist");
-}
-
-if(-e "pre_2_sim.fig4.dat")
-{
-	is("exists","exists");
-}
-else
-{
-	is("does not exist fig4","exist");
-}
-
-unlink "pre_2_sim.gap.log", "pre_2_sim.fig2.dat","pre_2_sim.fig3a.dat","pre_2_sim.fig3b.dat","pre_2_sim.fig4.dat";
+unlink "pre_2_sim.gap.log", "pre_2_sim.obs.dat","pre_2_sim.exp.dat","pre_2_sim.gap.dat";
 
 __END__

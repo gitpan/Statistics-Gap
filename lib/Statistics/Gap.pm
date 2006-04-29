@@ -14,7 +14,7 @@ our @ISA = qw(Exporter);
 
 our @EXPORT = qw( gap );
 
-our $VERSION = '0.09';
+our $VERSION = '0.10';
 
 # Estimates the number of clusters that a given data naturally falls into
 sub gap
